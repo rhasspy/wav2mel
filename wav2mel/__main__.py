@@ -5,6 +5,10 @@ import os
 import sys
 from pathlib import Path
 
+import jsonlines
+import numpy as np
+import scipy.io.wavfile
+
 from wav2mel import create_stft, wav2mel
 
 _LOGGER = logging.getLogger("wav2mel")
@@ -15,7 +19,6 @@ _LOGGER = logging.getLogger("wav2mel")
 def main():
     parser = argparse.ArgumentParser(prog="wav2mel")
     parser.add_argument("wav", nargs="*", help="Path(s) to WAV file(s)")
-    parser.add_argument("--output-dir", help="Path to output directory")
 
     # STFT settings
     parser.add_argument("--filter-length", type=int, default=1024)
@@ -56,22 +59,32 @@ def main():
         mel_fmax=args.mel_fmax,
     )
 
-    import scipy.io.wavfile
-    import numpy as np
+    # Outline a line of JSON for each input file
+    writer = jsonlines.Writer(sys.stdout, flush=True)
+    output_obj = {
+        "id": "",
+        "audio": {
+            "filter_length": args.filter_length,
+            "hop_length": args.hop_length,
+            "win_length": args.win_length,
+            "mel_channels": args.mel_channels,
+            "sample_rate": args.sampling_rate,
+            "sample_bytes": 2,
+            "samples": 0,
+            "channels": 1,
+            "mel_fmin": args.mel_fmin,
+            "mel_fmax": args.mel_fmax,
+            "normalized": not args.no_normalize,
+        },
+        "mel": [],
+    }
 
+    num_wavs = 0
     if args.wav:
         # Convert to paths
         args.wav = [Path(p) for p in args.wav]
 
-        if args.output_dir:
-            args.output_dir = Path(args.output_dir)
-        else:
-            args.output_dir = Path.cwd()
-
-        args.output_dir.mkdir(parents=True, exist_ok=True)
-
         # Process WAVs
-        num_wavs = 0
         for wav_path in args.wav:
             _LOGGER.debug("Processing %s", wav_path)
             sample_rate, wav_array = scipy.io.wavfile.read(wav_path)
@@ -84,16 +97,12 @@ def main():
                 wav_array /= args.max_wav_value
 
             mel_array = wav2mel(wav_array, stft=stft)
+            output_obj["id"] = wav_path.stem
+            output_obj["mel"] = mel_array.tolist()
+            output_obj["audio"]["samples"] = len(wav_array)
 
-            # Save mel
-            mel_path = args.output_dir / ((wav_path.stem) + ".npy")
-            with open(mel_path, "wb") as mel_file:
-                np.save(mel_file, mel_array, allow_pickle=True)
-
-            _LOGGER.debug("Wrote %s", mel_path)
+            writer.write(output_obj)
             num_wavs += 1
-
-        _LOGGER.info("Done. Wrote %s mel(s) to %s", num_wavs, args.output_dir)
     else:
         # Read from stdin, write to stdout
         if os.isatty(sys.stdin.fileno()):
@@ -109,9 +118,12 @@ def main():
             wav_array /= args.max_wav_value
 
         mel_array = wav2mel(wav_array, stft=stft)
+        output_obj["mel"] = mel_array.tolist()
+        output_obj["audio"]["samples"] = len(wav_array)
+        writer.write(output_obj)
+        num_wavs += 1
 
-        # Write mel to stdout
-        np.save(sys.stdout.buffer, mel_array, allow_pickle=True)
+    _LOGGER.info("Done (%s WAV file(s))", num_wavs)
 
 
 # -----------------------------------------------------------------------------
