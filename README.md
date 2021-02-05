@@ -35,7 +35,7 @@ $ pip install wav2mel
       "mel_fmax": max frequency for mel (default: 8000),
       "normalized": true if audio was normalized (default),
   },
-  "mel": [numpy array of shape (mel_channels, )],
+  "mel": [numpy array of shape (mel_channels, mel_windows)]
 }
 ```
 
@@ -60,3 +60,15 @@ See `wav2mel --help` for more options (filter/hop/window length, sample rate, et
 ```sh
 $ find /path/to/wavs -name '*.wav' -type f | parallel -X wav2mel | gzip -9 --to-stdout > JSON_FILE.gz
 ```
+
+## Griffin-Lim
+
+You can convert a mel spectrogram to WAV audio too:
+
+```sh
+$ griffim_lim /path/to/wavs/ < JSON_FILE
+```
+
+This will write WAV files with names `<id>.wav` where `<id>` is the value if the "id" field in each JSON object or a timestamp if not available.
+
+See `griffin-lim --help` for more options.

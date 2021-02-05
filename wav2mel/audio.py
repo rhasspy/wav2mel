@@ -1,5 +1,5 @@
 import numpy as np
-from librosa.filters import mel as librosa_mel_fn  # pylint: disable=import-error
+from librosa.filters import mel as librosa_mel_fn
 
 from wav2mel.stft import STFT
 

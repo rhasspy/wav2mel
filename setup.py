@@ -36,7 +36,12 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     package_data={"wav2mel": ["py.typed"]},
     install_requires=requirements,
-    entry_points={"console_scripts": ["wav2mel = wav2mel.__main__:main"]},
+    entry_points={
+        "console_scripts": [
+            "wav2mel = wav2mel.__main__:main",
+            "griffin-lim = wav2mel.griffin_lim.main",
+        ]
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.6",

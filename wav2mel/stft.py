@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import numpy as np
-from librosa import stft  # pylint: disable=import-error
+from librosa import istft, stft
 
 
 class STFT:
@@ -39,9 +39,9 @@ class STFT:
 
     def __init__(
         self,
-        filter_length: int = 800,
-        hop_length: int = 200,
-        win_length: int = 800,
+        filter_length: int = 1024,
+        hop_length: int = 256,
+        win_length: int = 1024,
         window: str = "hann",
     ):
         self.filter_length = filter_length
@@ -70,3 +70,22 @@ class STFT:
         phase = np.arctan2(imag_part.data, real_part.data)
 
         return magnitude, phase
+
+    def inverse(self, magnitude, phase):
+        recombine_magnitude_phase = np.concatenate(
+            [magnitude * np.cos(phase), magnitude * np.sin(phase)], axis=1
+        )
+
+        x_org = recombine_magnitude_phase
+        n_b, n_f, n_t = x_org.shape  # pylint: disable=unpacking-non-sequence
+        x = np.empty([n_b, n_f // 2, n_t], dtype=np.complex64)
+        x.real = x_org[:, : n_f // 2]
+        x.imag = x_org[:, n_f // 2 :]
+        inverse_transform = []
+        for y in x:
+            y_ = istft(y, self.hop_length, self.win_length, self.window)
+            inverse_transform.append(y_[None, :])
+
+        inverse_transform = np.concatenate(inverse_transform, 0)
+
+        return inverse_transform
