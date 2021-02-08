@@ -19,6 +19,7 @@ _LOGGER = logging.getLogger("wav2mel")
 def main():
     parser = argparse.ArgumentParser(prog="wav2mel")
     parser.add_argument("wav", nargs="*", help="Path(s) to WAV file(s)")
+    parser.add_argument("--id", default="", help="Set mel id when using stdin")
 
     # STFT settings
     parser.add_argument("--filter-length", type=int, default=1024)
@@ -62,7 +63,7 @@ def main():
     # Outline a line of JSON for each input file
     writer = jsonlines.Writer(sys.stdout, flush=True)
     output_obj = {
-        "id": "",
+        "id": args.id,
         "audio": {
             "filter_length": args.filter_length,
             "hop_length": args.hop_length,
