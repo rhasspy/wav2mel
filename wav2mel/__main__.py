@@ -3,6 +3,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 import jsonlines
@@ -20,6 +21,17 @@ def main():
     parser = argparse.ArgumentParser(prog="wav2mel")
     parser.add_argument("wav", nargs="*", help="Path(s) to WAV file(s)")
     parser.add_argument("--id", default="", help="Set mel id when using stdin")
+    parser.add_argument(
+        "--numpy",
+        action="store_true",
+        help="Output numpy file(s) instead of JSONL (see --numpy-dir)",
+    )
+    parser.add_argument(
+        "--numpy-batch-dimension",
+        action="store_true",
+        help="Include batch dimension in numpy arrays",
+    )
+    parser.add_argument("--numpy-dir", help="Directory to save numpy file(s)")
 
     # STFT settings
     parser.add_argument("--filter-length", type=int, default=1024)
@@ -49,6 +61,18 @@ def main():
         logging.basicConfig(level=logging.INFO)
 
     _LOGGER.debug(args)
+
+    if args.numpy:
+        if args.numpy_dir:
+            args.numpy_dir = Path(args.numpy_dir)
+        elif args.wav:
+            # Default to current directory
+            args.numpy_dir = Path.cwd()
+
+        if args.numpy_dir:
+            args.numpy_dir.mkdir(parents=True, exist_ok=True)
+
+    # -------------------------------------------------------------------------
 
     stft = create_stft(
         filter_length=args.filter_length,
@@ -98,11 +122,22 @@ def main():
                 wav_array /= args.max_wav_value
 
             mel_array = wav2mel(wav_array, stft=stft)
-            output_obj["id"] = wav_path.stem
-            output_obj["mel"] = mel_array.tolist()
-            output_obj["audio"]["samples"] = len(wav_array)
 
-            writer.write(output_obj)
+            if args.numpy:
+                if args.numpy_batch_dimension:
+                    mel_array = np.expand_dims(mel_array, 0)
+
+                # Save to numpy file
+                mel_path = args.numpy_dir / ((wav_path.stem) + ".npy")
+                np.save(mel_path, mel_array)
+            else:
+                # Output JSONL
+                output_obj["id"] = wav_path.stem
+                output_obj["mel"] = mel_array.tolist()
+                output_obj["audio"]["samples"] = len(wav_array)
+
+                writer.write(output_obj)
+
             num_wavs += 1
     else:
         # Read from stdin, write to stdout
@@ -119,9 +154,24 @@ def main():
             wav_array /= args.max_wav_value
 
         mel_array = wav2mel(wav_array, stft=stft)
-        output_obj["mel"] = mel_array.tolist()
-        output_obj["audio"]["samples"] = len(wav_array)
-        writer.write(output_obj)
+
+        if args.numpy:
+            if args.numpy_batch_dimension:
+                mel_array = np.expand_dims(mel_array, 0)
+
+            # Write numpy file
+            if args.numpy_dir:
+                mel_id = args.id or str(time.time())
+                mel_path = args.numpy_dir / f"{mel_id}.npy"
+                np.save(mel_path, mel_array)
+            else:
+                # Write to stdout
+                np.save(sys.stdout.buffer, mel_array)
+        else:
+            output_obj["mel"] = mel_array.tolist()
+            output_obj["audio"]["samples"] = len(wav_array)
+            writer.write(output_obj)
+
         num_wavs += 1
 
     _LOGGER.info("Done (%s WAV file(s))", num_wavs)
