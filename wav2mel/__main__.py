@@ -6,9 +6,9 @@ import sys
 import time
 from pathlib import Path
 
+import librosa
 import jsonlines
 import numpy as np
-import scipy.io.wavfile
 
 from wav2mel import create_stft, wav2mel
 
@@ -112,12 +112,9 @@ def main():
         # Process WAVs
         for wav_path in args.wav:
             _LOGGER.debug("Processing %s", wav_path)
-            sample_rate, wav_array = scipy.io.wavfile.read(wav_path)
-            assert (
-                sample_rate == args.sampling_rate
-            ), f"{wav_path} has sample rate {sample_rate}, expected {args.sampling_rate}"
-
-            wav_array = wav_array.astype(np.float32)
+            wav_array, _ = librosa.load(wav_path, sr=args.sampling_rate).astype(
+                np.float32
+            )
             if not args.no_normalize:
                 wav_array /= args.max_wav_value
 
@@ -144,12 +141,9 @@ def main():
         if os.isatty(sys.stdin.fileno()):
             print("Reading WAV data from stdin...", file=sys.stderr)
 
-        sample_rate, wav_array = scipy.io.wavfile.read(sys.stdin.buffer)
-        assert (
-            sample_rate == args.sampling_rate
-        ), f"WAV has sample rate {sample_rate}, expected {args.sampling_rate}"
-
-        wav_array = wav_array.astype(np.float32)
+        wav_array, _ = librosa.load(sys.stdin.buffer, sr=args.sampling_rate).astype(
+            np.float32
+        )
         if not args.no_normalize:
             wav_array /= args.max_wav_value
 
