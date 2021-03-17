@@ -57,6 +57,9 @@ def main():
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
+
+        # Disable numba logging
+        logging.getLogger("numba").setLevel(logging.WARNING)
     else:
         logging.basicConfig(level=logging.INFO)
 
@@ -111,29 +114,32 @@ def main():
 
         # Process WAVs
         for wav_path in args.wav:
-            _LOGGER.debug("Processing %s", wav_path)
-            wav_array, _ = librosa.load(wav_path, sr=args.sampling_rate)
-            if not args.no_normalize:
-                wav_array /= args.max_wav_value
+            try:
+                _LOGGER.debug("Processing %s", wav_path)
+                wav_array, _ = librosa.load(wav_path, sr=args.sampling_rate)
+                if not args.no_normalize:
+                    wav_array /= args.max_wav_value
 
-            mel_array = wav2mel(wav_array, stft=stft)
+                mel_array = wav2mel(wav_array, stft=stft)
 
-            if args.numpy:
-                if args.numpy_batch_dimension:
-                    mel_array = np.expand_dims(mel_array, 0)
+                if args.numpy:
+                    if args.numpy_batch_dimension:
+                        mel_array = np.expand_dims(mel_array, 0)
 
-                # Save to numpy file
-                mel_path = args.numpy_dir / ((wav_path.stem) + ".npy")
-                np.save(mel_path, mel_array)
-            else:
-                # Output JSONL
-                output_obj["id"] = wav_path.stem
-                output_obj["mel"] = mel_array.tolist()
-                output_obj["audio"]["samples"] = len(wav_array)
+                    # Save to numpy file
+                    mel_path = args.numpy_dir / ((wav_path.stem) + ".npy")
+                    np.save(mel_path, mel_array)
+                else:
+                    # Output JSONL
+                    output_obj["id"] = wav_path.stem
+                    output_obj["mel"] = mel_array.tolist()
+                    output_obj["audio"]["samples"] = len(wav_array)
 
-                writer.write(output_obj)
+                    writer.write(output_obj)
 
-            num_wavs += 1
+                num_wavs += 1
+            except Exception:
+                _LOGGER.exception(wav_path)
     else:
         # Read from stdin, write to stdout
         if os.isatty(sys.stdin.fileno()):
