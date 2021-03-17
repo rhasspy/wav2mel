@@ -50,8 +50,8 @@ class TacotronSTFT:
 
     def mel_spectrogram(self, y):
         """Computes mel-spectrograms from a batch of waves"""
-        assert np.min(y.data) >= -1
-        assert np.max(y.data) <= 1
+        #assert np.min(y.data) >= -1
+        #assert np.max(y.data) <= 1
 
         magnitudes, _phases = self.stft_fn.transform(y)
         magnitudes = magnitudes.data

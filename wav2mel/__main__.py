@@ -112,9 +112,7 @@ def main():
         # Process WAVs
         for wav_path in args.wav:
             _LOGGER.debug("Processing %s", wav_path)
-            wav_array, _ = librosa.load(wav_path, sr=args.sampling_rate).astype(
-                np.float32
-            )
+            wav_array, _ = librosa.load(wav_path, sr=args.sampling_rate)
             if not args.no_normalize:
                 wav_array /= args.max_wav_value
 
