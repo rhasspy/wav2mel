@@ -2,6 +2,7 @@
 import argparse
 import dataclasses
 import io
+import json
 import logging
 import os
 import sys
@@ -35,6 +36,7 @@ def main():
         help="Include batch dimension in numpy arrays",
     )
     parser.add_argument("--numpy-dir", help="Directory to save numpy file(s)")
+    parser.add_argument("--audio-config", help="Write JSON audio config to file")
 
     add_audio_settings(parser)
 
@@ -68,6 +70,9 @@ def main():
         if args.numpy_dir:
             args.numpy_dir.mkdir(parents=True, exist_ok=True)
 
+    if args.audio_config:
+        args.audio_config = Path(args.audio_config)
+
     # -------------------------------------------------------------------------
 
     audio_settings = AudioSettings(
@@ -89,6 +94,12 @@ def main():
         clip_norm=not args.no_clip_norm,
         symmetric_norm=not args.asymmetric_norm,
     )
+
+    if args.audio_config:
+        # Save audio config as JSON
+        args.audio_config.parent.mkdir(parents=True, exist_ok=True)
+        with open(args.audio_config, "w") as config_file:
+            json.dump(audio_settings.to_dict(), config_file, indent=4)
 
     # Outline a line of JSON for each input file
     writer = jsonlines.Writer(sys.stdout, flush=True)
