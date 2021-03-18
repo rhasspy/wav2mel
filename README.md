@@ -75,7 +75,7 @@ $ find /path/to/wavs -name '*.wav' -type f | parallel -X wav2mel | gzip -9 --to-
 You can convert a mel spectrogram to WAV audio too:
 
 ```sh
-$ griffim-lim /path/to/wavs/ < JSON_FILE
+$ griffim-lim --output-dir /path/to/wavs/ < JSON_FILE
 ```
 
 This will write WAV files with names `<id>.wav` where `<id>` is the value if the "id" field in each JSON object or a timestamp if not available.
@@ -83,7 +83,7 @@ This will write WAV files with names `<id>.wav` where `<id>` is the value if the
 Add `--numpy-files` to read `.npy` file names from stdin instead of JSONL:
 
 ```sh
-$ find /path/to/npy -name '*.npy' | griffin-lim --numpy-files /path/to/wavs
+$ find /path/to/npy -name '*.npy' | griffin-lim --numpy-files --output-dir /path/to/wavs
 ```
 
 See `griffin-lim --help` for more options.

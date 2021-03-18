@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Converts JSONL mel spectrograms to WAV audio using griffin-lim"""
 import argparse
+import io
 import json
 import logging
 import os
@@ -20,7 +21,7 @@ _LOGGER = logging.getLogger("wav2mel.griffin_lim")
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(prog="wav2mel.griffin_lim")
-    parser.add_argument("output_dir", help="Directory to write WAV files")
+    parser.add_argument("--output_dir", help="Directory to write WAV files")
     parser.add_argument("--iterations", type=int, default=60)
 
     parser.add_argument(
@@ -47,8 +48,9 @@ def main():
     _LOGGER.debug(args)
 
     # Convert to paths
-    args.output_dir = Path(args.output_dir)
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    if args.output_dir:
+        args.output_dir = Path(args.output_dir)
+        args.output_dir.mkdir(parents=True, exist_ok=True)
 
     # -------------------------------------------------------------------------
 
@@ -152,23 +154,34 @@ def main():
             _LOGGER.debug("Mel shape: %s", mel_db.shape)
 
             wav = audio_settings.mel2wav(mel_db, num_iters=args.iterations)
+            duration_sec = len(wav) / audio_settings.sample_rate
 
             # Save WAV data
             if not utt_id:
                 # Use timestamp
                 utt_id = str(time.time())
 
-            wav_path = args.output_dir / (utt_id + ".wav")
-            with open(wav_path, "wb") as wav_file:
-                scipy.io.wavfile.write(wav_file, audio_settings.sample_rate, wav)
+            if args.output_dir:
+                # Write to file
+                wav_path = args.output_dir / (utt_id + ".wav")
+                with open(wav_path, "wb") as wav_file:
+                    scipy.io.wavfile.write(wav_file, audio_settings.sample_rate, wav)
 
-            duration_sec = len(wav) / audio_settings.sample_rate
-            _LOGGER.debug(
-                "Wrote %s (%s sample(s), %s second(s))",
-                wav_path,
-                len(wav),
-                duration_sec,
-            )
+                _LOGGER.debug(
+                    "Wrote %s (%s sample(s), %s second(s))",
+                    wav_path,
+                    len(wav),
+                    duration_sec,
+                )
+            else:
+                # Write to stdout
+                with io.BytesIO() as wav_file:
+                    scipy.io.wavfile.write(wav_file, audio_settings.sample_rate, wav)
+                    sys.stdout.buffer.write(wav_file.getvalue())
+
+                _LOGGER.debug(
+                    "Wrote (%s sample(s), %s second(s))", len(wav), duration_sec
+                )
     except KeyboardInterrupt:
         pass
 

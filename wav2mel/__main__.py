@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import dataclasses
+import io
 import logging
 import os
 import sys
@@ -146,7 +147,9 @@ def main():
         if os.isatty(sys.stdin.fileno()):
             print("Reading WAV data from stdin...", file=sys.stderr)
 
-        wav_array, _ = librosa.load(sys.stdin.buffer, sr=args.sample_rate)
+        with io.BytesIO(sys.stdin.buffer.read()) as wav_file:
+            wav_array, _ = librosa.load(wav_file, sr=args.sample_rate)
+
         wav_array = wav_array.astype(np.float32)
 
         mel_array = audio_settings.wav2mel(
@@ -164,7 +167,9 @@ def main():
                 np.save(mel_path, mel_array)
             else:
                 # Write to stdout
-                np.save(sys.stdout.buffer, mel_array)
+                with io.BytesIO() as np_file:
+                    np.save(np_file, mel_array)
+                    sys.stdout.buffer.write(np_file.getvalue())
         else:
             output_obj["mel"] = mel_array.tolist()
             output_obj["audio"]["samples"] = len(wav_array)

@@ -48,7 +48,7 @@ class AudioSettings(DataClassJsonMixin):
     # -------------------------------------------------------------------------
 
     def wav2mel(
-        self, wav: np.ndarray, trim_silence: bool = False, trim_db: float = 20.0
+        self, wav: np.ndarray, trim_silence: bool = False, trim_db: float = 60.0
     ) -> np.ndarray:
         if trim_silence:
             wav = self.trim_silence(wav, trim_db=trim_db)
@@ -171,14 +171,29 @@ class AudioSettings(DataClassJsonMixin):
     # -------------------------------------------------------------------------
 
     def trim_silence(
-        self, wav: np.ndarray, trim_db: float = 20.0, margin_sec: float = 0.01
+        self,
+        wav: np.ndarray,
+        trim_db: float = 60.0,
+        margin_sec: float = 0.01,
+        keep_sec: float = 0.1,
     ):
-        """ Trim silent parts with a threshold and margin """
+        """
+        Trim silent parts with a threshold and margin.
+        Keep keep_sec seconds on either side of trimmed audio.
+        """
         margin = int(self.sample_rate * margin_sec)
         wav = wav[margin:-margin]
-        return librosa.effects.trim(
+        _, trim_index = librosa.effects.trim(
             wav,
             top_db=trim_db,
             frame_length=self.win_length,
             hop_length=self.hop_length,
-        )[0]
+        )
+
+        keep_samples = int(self.sample_rate * keep_sec)
+        trim_start, trim_end = (
+            max(0, trim_index[0] - keep_samples),
+            min(len(wav), trim_index[1] + keep_samples),
+        )
+
+        return wav[trim_start:trim_end]
