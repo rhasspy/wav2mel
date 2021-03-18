@@ -123,48 +123,46 @@ class AudioSettings(DataClassJsonMixin):
     # Normalization
     # -------------------------------------------------------------------------
 
-    def normalize(self, wav: np.ndarray) -> np.ndarray:
+    def normalize(self, mel_db: np.ndarray) -> np.ndarray:
         """Put values in [0, max_norm] or [-max_norm, max_norm]"""
-        wav_norm = ((wav - self.ref_level_db) - self.min_level_db) / (
+        mel_norm = ((mel_db - self.ref_level_db) - self.min_level_db) / (
             -self.min_level_db
         )
         if self.symmetric_norm:
             # Symmetric norm
-            wav_norm = ((2 * self.max_norm) * wav_norm) - self.max_norm
+            mel_norm = ((2 * self.max_norm) * mel_norm) - self.max_norm
             if self.clip_norm:
-                wav_norm = np.clip(wav_norm, -self.max_norm, self.max_norm)
+                mel_norm = np.clip(mel_norm, -self.max_norm, self.max_norm)
         else:
             # Asymmetric norm
-            wav_norm = self.max_norm * wav_norm
+            mel_norm = self.max_norm * mel_norm
             if self.clip_norm:
-                wav_norm = np.clip(wav_norm, 0, self.max_norm)
+                mel_norm = np.clip(mel_norm, 0, self.max_norm)
 
-        return wav_norm
+        return mel_norm
 
-    def denormalize(self, audio: np.ndarray) -> np.ndarray:
+    def denormalize(self, mel_db: np.ndarray) -> np.ndarray:
         """Pull values out of [0, max_norm] or [-max_norm, max_norm]"""
         if self.symmetric_norm:
             # Symmetric norm
             if self.clip_norm:
-                audio_denorm = np.clip(audio, -self.max_norm, self.max_norm)
+                mel_denorm = np.clip(mel_db, -self.max_norm, self.max_norm)
 
-            audio_denorm = (
-                (audio_denorm + self.max_norm)
-                * -self.min_level_db
-                / (2 * self.max_norm)
+            mel_denorm = (
+                (mel_denorm + self.max_norm) * -self.min_level_db / (2 * self.max_norm)
             ) + self.min_level_db
         else:
             # Asymmetric norm
             if self.clip_norm:
-                audio_denorm = np.clip(audio, 0, self.max_norm)
+                mel_denorm = np.clip(mel_db, 0, self.max_norm)
 
-            audio_denorm = (
-                audio_denorm * -self.min_level_db / self.max_norm
+            mel_denorm = (
+                mel_denorm * -self.min_level_db / self.max_norm
             ) + self.min_level_db
 
-        audio_denorm += self.ref_level_db
+        mel_denorm += self.ref_level_db
 
-        return audio_denorm
+        return mel_denorm
 
     # -------------------------------------------------------------------------
     # Silence Trimming
