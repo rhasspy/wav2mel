@@ -1,3 +1,4 @@
+dataclasses-json==0.4.2
 jsonlines~=1.2.0
 librosa==0.7.2
 numba==0.48

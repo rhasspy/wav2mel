@@ -33,7 +33,14 @@ $ pip install wav2mel
       "channels": number of channels in the audio (default: 1),
       "mel_fmin": min frequency for mel (default: 0),
       "mel_fmax": max frequency for mel (default: 8000),
-      "normalized": true if audio was normalized (default),
+      "ref_level_db": threshold to discard audio (default: 20),
+      "spec_gain": gain in amp to db conversion (default: 1),
+      
+      "signal_norm": true if mel was normalized (default: true),
+      "max_norm": range of normalization (default: 4),
+      "min_level_db": min db for normalization (default: -100),
+      "clip_norm": clip during normalization (default: true),
+      "symmetric_norm": normalize in [-max_norm, max_norm] instead of [0, max_norm] (default: true)
   },
   "mel": [numpy array of shape (mel_channels, mel_windows)]
 }
@@ -53,6 +60,8 @@ Multiple WAV files can also be converted and saved to a compressed archive:
 $ wav2mel WAVE_FILE [WAVE_FILE ...] | gzip --to-stdout > JSON_FILE.gz
 ```
 
+Add `--numpy` to output a `.npy` file instead of JSONL. Use `--numpy-dir` for multiple WAV files.
+
 See `wav2mel --help` for more options (filter/hop/window length, sample rate, etc.).
 
 ## With GNU Parallel
@@ -66,9 +75,15 @@ $ find /path/to/wavs -name '*.wav' -type f | parallel -X wav2mel | gzip -9 --to-
 You can convert a mel spectrogram to WAV audio too:
 
 ```sh
-$ griffim_lim /path/to/wavs/ < JSON_FILE
+$ griffim-lim /path/to/wavs/ < JSON_FILE
 ```
 
 This will write WAV files with names `<id>.wav` where `<id>` is the value if the "id" field in each JSON object or a timestamp if not available.
+
+Add `--numpy-files` to read `.npy` file names from stdin instead of JSONL:
+
+```sh
+$ find /path/to/npy -name '*.npy' | griffin-lim --numpy-files /path/to/wavs
+```
 
 See `griffin-lim --help` for more options.
