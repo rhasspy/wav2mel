@@ -25,6 +25,9 @@ def main():
     parser.add_argument("--iterations", type=int, default=60)
 
     parser.add_argument(
+        "--numpy", action="store_true", help="Standard input is a single numpy file"
+    )
+    parser.add_argument(
         "--numpy-files",
         action="store_true",
         help="Input is a list of .npy files instead of JSONL",
@@ -92,11 +95,55 @@ def main():
         "symmetric_norm",
     ]
 
+    # -------------------------------------------------------------------------
+
+    def process_mel(mel_db: np.ndarray, utt_id: str = ""):
+        # Run griffin-lim
+        _LOGGER.debug("Mel shape: %s", mel_db.shape)
+
+        wav = audio_settings.mel2wav(mel_db, num_iters=args.iterations)
+        duration_sec = len(wav) / audio_settings.sample_rate
+
+        # Save WAV data
+        if not utt_id:
+            # Use timestamp
+            utt_id = str(time.time())
+
+        if args.output_dir:
+            # Write to file
+            wav_path = args.output_dir / (utt_id + ".wav")
+            with open(wav_path, "wb") as wav_file:
+                scipy.io.wavfile.write(wav_file, audio_settings.sample_rate, wav)
+
+            _LOGGER.debug(
+                "Wrote %s (%s sample(s), %s second(s))",
+                wav_path,
+                len(wav),
+                duration_sec,
+            )
+        else:
+            # Write to stdout
+            with io.BytesIO() as wav_file:
+                scipy.io.wavfile.write(wav_file, audio_settings.sample_rate, wav)
+                sys.stdout.buffer.write(wav_file.getvalue())
+
+            _LOGGER.debug("Wrote (%s sample(s), %s second(s))", len(wav), duration_sec)
+
+    # -------------------------------------------------------------------------
+
     if os.isatty(sys.stdin.fileno()):
-        if args.numpy_files:
+        if args.numpy:
+            print("Reading numpy array from stdin...", file=sys.stderr)
+        elif args.numpy_files:
             print("Reading numpy file names from stdin...", file=sys.stderr)
         else:
             print("Reading JSON from stdin...", file=sys.stderr)
+
+    if args.numpy:
+        # stdin is single numpy array
+        mel_db = np.load(sys.stdin.buffer, allow_pickle=True).astype(np.float32)
+        process_mel(mel_db)
+        return
 
     # Read JSON objects from standard input.
     # Each object should have this structure:
@@ -150,38 +197,8 @@ def main():
 
                 mel_db = np.array(mel_obj["mel"], dtype=np.float32)
 
-            # Run griffin-lim
-            _LOGGER.debug("Mel shape: %s", mel_db.shape)
+            process_mel(mel_db, utt_id)
 
-            wav = audio_settings.mel2wav(mel_db, num_iters=args.iterations)
-            duration_sec = len(wav) / audio_settings.sample_rate
-
-            # Save WAV data
-            if not utt_id:
-                # Use timestamp
-                utt_id = str(time.time())
-
-            if args.output_dir:
-                # Write to file
-                wav_path = args.output_dir / (utt_id + ".wav")
-                with open(wav_path, "wb") as wav_file:
-                    scipy.io.wavfile.write(wav_file, audio_settings.sample_rate, wav)
-
-                _LOGGER.debug(
-                    "Wrote %s (%s sample(s), %s second(s))",
-                    wav_path,
-                    len(wav),
-                    duration_sec,
-                )
-            else:
-                # Write to stdout
-                with io.BytesIO() as wav_file:
-                    scipy.io.wavfile.write(wav_file, audio_settings.sample_rate, wav)
-                    sys.stdout.buffer.write(wav_file.getvalue())
-
-                _LOGGER.debug(
-                    "Wrote (%s sample(s), %s second(s))", len(wav), duration_sec
-                )
     except KeyboardInterrupt:
         pass
 
