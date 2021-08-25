@@ -39,7 +39,7 @@ setuptools.setup(
     entry_points={
         "console_scripts": [
             "wav2mel = wav2mel.__main__:main",
-            "griffin-lim = wav2mel.griffin_lim.main",
+            "mel2wav = wav2mel.griffin_lim.main",
         ]
     },
     classifiers=[

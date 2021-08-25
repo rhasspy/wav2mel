@@ -1,13 +1,13 @@
+"""Audio settings for wav2mel"""
 import typing
 from dataclasses import dataclass
 
 import librosa
 import numpy as np
-from dataclasses_json import DataClassJsonMixin
 
 
 @dataclass
-class AudioSettings(DataClassJsonMixin):
+class AudioSettings:
     """Settings for wav <-> mel"""
 
     # STFT settings

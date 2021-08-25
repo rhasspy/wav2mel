@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
+"""Command-line interface for wav2mel"""
 import argparse
-import dataclasses
 import io
-import json
 import logging
 import os
 import sys
-import time
 from pathlib import Path
 
-import jsonlines
 import librosa
 import numpy as np
 
@@ -24,19 +21,13 @@ _LOGGER = logging.getLogger("wav2mel")
 def main():
     parser = argparse.ArgumentParser(prog="wav2mel")
     parser.add_argument("wav", nargs="*", help="Path(s) to WAV file(s)")
-    parser.add_argument("--id", default="", help="Set mel id when using stdin")
     parser.add_argument(
-        "--numpy",
+        "--batch-dim",
         action="store_true",
-        help="Output numpy file(s) instead of JSONL (see --numpy-dir)",
+        help="Include batch dimension in output arrays",
     )
-    parser.add_argument(
-        "--numpy-batch-dimension",
-        action="store_true",
-        help="Include batch dimension in numpy arrays",
-    )
-    parser.add_argument("--numpy-dir", help="Directory to save numpy file(s)")
-    parser.add_argument("--audio-config", help="Write JSON audio config to file")
+    parser.add_argument("--output-dir", help="Directory to save numpy file(s)")
+    parser.add_argument("--dtype", default="float32", help="numpy data type for mel")
 
     add_audio_settings(parser)
 
@@ -60,18 +51,11 @@ def main():
 
     _LOGGER.debug(args)
 
-    if args.numpy:
-        if args.numpy_dir:
-            args.numpy_dir = Path(args.numpy_dir)
-        elif args.wav:
-            # Default to current directory
-            args.numpy_dir = Path.cwd()
-
-        if args.numpy_dir:
-            args.numpy_dir.mkdir(parents=True, exist_ok=True)
-
-    if args.audio_config:
-        args.audio_config = Path(args.audio_config)
+    if args.output_dir:
+        args.output_dir = Path(args.output_dir)
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        args.output_dir = Path.cwd()
 
     # -------------------------------------------------------------------------
 
@@ -95,30 +79,6 @@ def main():
         symmetric_norm=not args.asymmetric_norm,
     )
 
-    if args.audio_config:
-        # Save audio config as JSON
-        args.audio_config.parent.mkdir(parents=True, exist_ok=True)
-        with open(args.audio_config, "w") as config_file:
-            json.dump(audio_settings.to_dict(), config_file, indent=4)
-
-    # Outline a line of JSON for each input file
-    writer = jsonlines.Writer(sys.stdout, flush=True)
-    output_obj = {
-        "id": args.id,
-        "audio": {
-            # Audio settings
-            **dataclasses.asdict(audio_settings),
-            "sample_bytes": 2,
-            "samples": 0,
-            "channels": 1,
-            #
-            # Silence trimming
-            "silence_trimmed": args.trim_silence,
-            "trim_db": args.trim_db,
-        },
-        "mel": [],
-    }
-
     num_wavs = 0
     if args.wav:
         # Convert to paths
@@ -129,26 +89,18 @@ def main():
             try:
                 _LOGGER.debug("Processing %s", wav_path)
                 wav_array, _ = librosa.load(wav_path, sr=args.sample_rate)
-                wav_array = wav_array.astype(np.float32)
+                wav_array = wav_array.astype(args.dtype)
 
                 mel_array = audio_settings.wav2mel(
                     wav_array, trim_silence=args.trim_silence, trim_db=args.trim_db
                 )
 
-                if args.numpy:
-                    if args.numpy_batch_dimension:
-                        mel_array = np.expand_dims(mel_array, 0)
+                if args.batch_dim:
+                    mel_array = np.expand_dims(mel_array, 0)
 
-                    # Save to numpy file
-                    mel_path = args.numpy_dir / ((wav_path.stem) + ".npy")
-                    np.save(mel_path, mel_array)
-                else:
-                    # Output JSONL
-                    output_obj["id"] = wav_path.stem
-                    output_obj["mel"] = mel_array.tolist()
-                    output_obj["audio"]["samples"] = len(wav_array)
-
-                    writer.write(output_obj)
+                # Save to numpy file
+                mel_path = args.output_dir / ((wav_path.stem) + ".npy")
+                np.save(mel_path, mel_array)
 
                 num_wavs += 1
             except Exception:
@@ -161,30 +113,19 @@ def main():
         with io.BytesIO(sys.stdin.buffer.read()) as wav_file:
             wav_array, _ = librosa.load(wav_file, sr=args.sample_rate)
 
-        wav_array = wav_array.astype(np.float32)
+        wav_array = wav_array.astype(args.dtype)
 
         mel_array = audio_settings.wav2mel(
             wav_array, trim_silence=args.trim_silence, trim_db=args.trim_db
         )
 
-        if args.numpy:
-            if args.numpy_batch_dimension:
-                mel_array = np.expand_dims(mel_array, 0)
+        if args.batch_dim:
+            mel_array = np.expand_dims(mel_array, 0)
 
-            # Write numpy file
-            if args.numpy_dir:
-                mel_id = args.id or str(time.time())
-                mel_path = args.numpy_dir / f"{mel_id}.npy"
-                np.save(mel_path, mel_array)
-            else:
-                # Write to stdout
-                with io.BytesIO() as np_file:
-                    np.save(np_file, mel_array)
-                    sys.stdout.buffer.write(np_file.getvalue())
-        else:
-            output_obj["mel"] = mel_array.tolist()
-            output_obj["audio"]["samples"] = len(wav_array)
-            writer.write(output_obj)
+        # Write to stdout
+        with io.BytesIO() as np_file:
+            np.save(np_file, mel_array)
+            sys.stdout.buffer.write(np_file.getvalue())
 
         num_wavs += 1
 
